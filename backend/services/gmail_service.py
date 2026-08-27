@@ -10,9 +10,11 @@ Provides:
 """
 import base64
 import glob
+import html
 import json
 import logging
 import os
+import re
 import threading
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
@@ -48,6 +50,46 @@ def _find_client_secret() -> Optional[Path]:
         if f.suffix == ".json" and f.name != "gmail_token.json" and "client" in f.name.lower():
             return f
     return None
+
+
+def text_to_html(text: str) -> str:
+    """
+    Convert plain text/markdown email body into clean, styled HTML
+    with clickable links for Portfolio, GitHub, LinkedIn, and any URLs.
+    """
+    escaped = html.escape(text)
+
+    # 1. Convert markdown links: [Text](https://url) -> <a href="https://url">Text</a>
+    def _md_link_sub(match):
+        label = match.group(1)
+        url = match.group(2)
+        return f'<a href="{url}" target="_blank" style="color: #1a73e8; text-decoration: underline;">{label}</a>'
+
+    escaped = re.sub(r'\[([^\]]+)\]\((https?://[^\s\)]+)\)', _md_link_sub, escaped)
+
+    # 2. Convert standalone URLs (not inside href="...") into clickable links
+    def _url_sub(match):
+        url = match.group(0)
+        trailing = ""
+        while url and url[-1] in ".,;:)":
+            trailing = url[-1] + trailing
+            url = url[:-1]
+        return f'<a href="{url}" target="_blank" style="color: #1a73e8; text-decoration: underline;">{url}</a>{trailing}'
+
+    escaped = re.sub(r'(?<!href=")(?<!">)(https?://[^\s<>"\'\)]+)', _url_sub, escaped)
+
+    # 3. Format paragraphs and line breaks
+    paragraphs = [p.strip() for p in escaped.split("\n\n") if p.strip()]
+    formatted_paras = []
+    for p in paragraphs:
+        p_html = p.replace("\n", "<br>")
+        formatted_paras.append(f'<p style="margin: 0 0 14px 0; padding: 0;">{p_html}</p>')
+
+    content = "\n".join(formatted_paras)
+    return (
+        f'<div style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif; '
+        f'font-size: 14px; line-height: 1.5; color: #202124;">\n{content}\n</div>'
+    )
 
 
 class GmailService:
@@ -181,10 +223,18 @@ class GmailService:
         if not creds:
             raise RuntimeError("Gmail not connected. Please authenticate first.")
 
-        # Build MIME message
+        # Build HTML version of body with clickable links
+        html_body = text_to_html(body)
+
+        # Create alternative part (plain text + HTML)
+        alt_part = MIMEMultipart("alternative")
+        alt_part.attach(MIMEText(body, "plain", "utf-8"))
+        alt_part.attach(MIMEText(html_body, "html", "utf-8"))
+
+        # Build MIME message with optional attachment
         if resume_path and resume_path.exists():
-            msg = MIMEMultipart()
-            msg.attach(MIMEText(body, "plain"))
+            msg = MIMEMultipart("mixed")
+            msg.attach(alt_part)
 
             # Attach PDF
             with open(resume_path, "rb") as f:
@@ -197,7 +247,7 @@ class GmailService:
             )
             msg.attach(attachment)
         else:
-            msg = MIMEText(body, "plain")
+            msg = alt_part
 
         msg["To"] = to
         msg["Subject"] = subject

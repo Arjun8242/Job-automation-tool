@@ -269,6 +269,8 @@ STRICT GROUNDING RULES — NEVER VIOLATE:
 9. Avoid clichéd openers like "I hope this email finds you well" or "I am writing to express my eager interest".
 10. Start the body with the exact greeting provided.
 11. Replace all placeholder variables with actual values. Never return bracketed placeholders.
+12. DO NOT output any HTML tags (no <a>, <p>, <br>, etc.). Return pure plain text only.
+13. Format links naturally using markdown [Portfolio](url), [GitHub](url), [LinkedIn](url) or include the URLs directly.
 
 --- REQUIRED EMAIL STRUCTURE ---
 
@@ -294,7 +296,7 @@ The email should answer these questions in order:
    and mention that my resume is attached.
 
 7. Where can they learn more?
-   Include my verified Portfolio, GitHub and LinkedIn.
+   Include my verified Portfolio, GitHub and LinkedIn links.
 
 Do not turn this into a cover letter.
 Keep it concise and conversational.
@@ -340,7 +342,7 @@ Domain keywords: {', '.join(jd_essentials.get('keywords', []))}
 Return ONLY this JSON:
 {{
   "subject": "<subject line>",
-  "body": "<plain text email body starting with greeting>"
+  "body": "<plain text email body starting with greeting, no HTML tags>"
 }}
 """
 
@@ -367,9 +369,10 @@ def humanize_email(
 
 RULES:
 1. Preserve all factual claims, metrics, project names, and links exactly.
-2. Remove robot-like phrases (e.g. "I am confident that", "thrilled to apply", "synergy", "seamlessly").
-3. Ensure natural email flow without unnecessary filler.
-4. Keep it concise.
+2. DO NOT output any HTML tags (no <a>, <p>, <br>, etc.). Keep the text as clean plain text.
+3. Remove robot-like phrases (e.g. "I am confident that", "thrilled to apply", "synergy", "seamlessly").
+4. Ensure natural email flow without unnecessary filler.
+5. Keep it concise.
 
 --- CURRENT EMAIL ---
 Subject: {subject}

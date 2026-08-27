@@ -1,23 +1,20 @@
 """
-Outreach API router — JD extraction + email generation (Phase 3 live).
+Outreach API router — email generation pipeline.
 """
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException
 from models.outreach import (
-    EmailTemplate,
-    JDExtractionRequest,
-    JDExtractionResult,
     EmailGenerationRequest,
     GeneratedEmail,
 )
-from utils.json_store import read_json, write_json, list_resumes
+from utils.json_store import read_json, list_resumes
 from services import ai_service
 
 router = APIRouter()
 
 
 # ---------------------------------------------------------------------------
-# Templates
+# Helpers
 # ---------------------------------------------------------------------------
 
 def _load_templates() -> List[dict]:
@@ -41,68 +38,6 @@ def _load_profile() -> dict:
         return {}
 
 
-@router.get("/templates", response_model=List[EmailTemplate])
-async def list_templates():
-    """Return all email templates."""
-    return [EmailTemplate(**t) for t in _load_templates()]
-
-
-@router.put("/templates/{template_id}", response_model=EmailTemplate)
-async def update_template(template_id: str, template: EmailTemplate):
-    """Update an existing template by id."""
-    templates = _load_templates()
-    idx = next((i for i, t in enumerate(templates) if t["id"] == template_id), None)
-    if idx is None:
-        raise HTTPException(status_code=404, detail=f"Template '{template_id}' not found.")
-    templates[idx] = template.model_dump()
-    write_json("templates.json", templates)
-    return template
-
-
-@router.post("/templates", response_model=EmailTemplate, status_code=201)
-async def create_template(template: EmailTemplate):
-    """Add a new email template."""
-    templates = _load_templates()
-    if any(t["id"] == template.id for t in templates):
-        raise HTTPException(status_code=409, detail=f"Template '{template.id}' already exists.")
-    templates.append(template.model_dump())
-    write_json("templates.json", templates)
-    return template
-
-
-# ---------------------------------------------------------------------------
-# JD Extraction
-# ---------------------------------------------------------------------------
-
-@router.post("/extract-jd", response_model=JDExtractionResult)
-async def extract_jd(request: JDExtractionRequest):
-    """
-    Extract key skills, keywords and recommend project/resume from a pasted JD
-    using Gemini AI.
-    """
-    projects = _load_projects()
-
-    try:
-        result = ai_service.analyze_jd(
-            job_description=request.job_description,
-            company=request.company,
-            role=request.role,
-            projects=projects,
-        )
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"AI extraction failed: {e}")
-
-    return JDExtractionResult(
-        company=result.get("company", request.company),
-        role=result.get("role", request.role),
-        location=result.get("location"),
-        skills=result.get("skills", []),
-        keywords=result.get("keywords", []),
-        recommended_projects=result.get("recommended_projects", []),
-        recommended_resume=result.get("recommended_resume"),
-    )
-
-
 # ---------------------------------------------------------------------------
 # Email Generation
 # ---------------------------------------------------------------------------
@@ -124,8 +59,10 @@ async def generate_email(request: EmailGenerationRequest):
 
     # --- Find template ---
     tmpl = next((t for t in templates if t["id"] == request.template_id), None)
-    if not tmpl:
-        raise HTTPException(status_code=404, detail=f"Template '{request.template_id}' not found.")
+    if not tmpl and templates:
+        tmpl = templates[0]
+    elif not tmpl:
+        raise HTTPException(status_code=404, detail="No email templates available.")
 
     # --- Step 1: Extract JD ---
     try:

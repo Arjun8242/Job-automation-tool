@@ -56,38 +56,7 @@ export interface Project {
   tags: string[];
 }
 
-// ─── Templates ───────────────────────────────────────────
-
-export interface EmailTemplate {
-  id: string;
-  name: string;
-  description?: string;
-  structure?: string[];
-  subject: string;
-  body: string;
-}
-
 // ─── Outreach ─────────────────────────────────────────────
-
-export interface JDExtractionRequest {
-  company: string;
-  role: string;
-  job_description: string;
-  recruiter_name?: string;
-  recruiter_email?: string;
-  job_url?: string;
-  notes?: string;
-}
-
-export interface JDExtractionResult {
-  company: string;
-  role: string;
-  location?: string;
-  skills: string[];
-  keywords: string[];
-  recommended_projects: string[];
-  recommended_resume?: string;
-}
 
 export interface EmailGenerationRequest {
   company: string;
@@ -95,7 +64,7 @@ export interface EmailGenerationRequest {
   recruiter_email: string;
   recruiter_name?: string;
   job_description: string;
-  template_id: string;
+  template_id?: string;
   selected_project_id?: string;
   selected_resume?: string;
   notes?: string;

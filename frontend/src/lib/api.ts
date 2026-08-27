@@ -4,9 +4,6 @@
  */
 
 import type {
-  EmailTemplate,
-  JDExtractionRequest,
-  JDExtractionResult,
   EmailGenerationRequest,
   GeneratedEmail,
   DraftCreationRequest,
@@ -36,12 +33,6 @@ async function request<T>(
   return res.json() as Promise<T>;
 }
 
-// ─── Templates ───────────────────────────────────────────
-
-export const templatesApi = {
-  list: () => request<EmailTemplate[]>("/api/outreach/templates"),
-};
-
 // ─── Resumes ─────────────────────────────────────────────
 
 export const resumesApi = {
@@ -51,11 +42,6 @@ export const resumesApi = {
 // ─── Outreach ─────────────────────────────────────────────
 
 export const outreachApi = {
-  extractJD: (req: JDExtractionRequest) =>
-    request<JDExtractionResult>("/api/outreach/extract-jd", {
-      method: "POST",
-      body: JSON.stringify(req),
-    }),
   generateEmail: (req: EmailGenerationRequest) =>
     request<GeneratedEmail>("/api/outreach/generate", {
       method: "POST",
