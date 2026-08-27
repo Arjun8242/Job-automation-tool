@@ -1,13 +1,14 @@
 """
-AI Service — Gemini implementation for Phase 3.
+AI Service — Gemini implementation.
 
 Pipeline:
-  analyze_jd()      → structured JSON extraction of JD essentials
-  select_projects() → LLM-assisted / tag-based project relevance ranking
-  select_resume()   → tag-based resume file selection from data/resumes/
-  generate_email()  → template + context → personalized draft
-  humanize_email()  → controlled tone/naturalness pass
-  validate_email()  → fact-check against profile/projects (guardrail)
+  analyze_jd()       → structured JSON extraction of JD essentials
+  select_projects()  → LLM-assisted / tag-based project relevance ranking
+  select_resume()    → tag-based resume file selection from data/resumes/
+  generate_email()   → template + context → personalized draft
+  humanize_email()   → controlled tone/naturalness pass
+  validate_email()   → fact-check against profile/projects (guardrail)
+  classify_fields()  → LLM classification for ambiguous form fields (V2)
 """
 import json
 import os
@@ -434,3 +435,72 @@ def validate_email(
         "subject": subject,
         "body": body,
     }
+
+
+# ---------------------------------------------------------------------------
+# 7. classify_fields (V2 — Chrome extension)
+# ---------------------------------------------------------------------------
+
+VALID_CATEGORIES = {
+    "PERSONAL", "CONTACT", "EDUCATION", "SOCIAL_LINK",
+    "SKILL", "RESUME", "AI_QUESTION", "UNKNOWN",
+}
+
+
+def classify_fields(fields: list[dict]) -> list[dict]:
+    """
+    Use LLM to classify ambiguous form fields into categories.
+
+    Input:  [{"id": "...", "label": "...", "type": "...", ...}, ...]
+    Output: [{"id": "...", "category": "...", "confidence": "high"|"low"}, ...]
+    """
+    if not fields:
+        return []
+
+    field_descriptions = json.dumps(
+        [{"id": f["id"], "label": f.get("label", ""), "type": f.get("type", "text")} for f in fields],
+        indent=2,
+    )
+
+    prompt = f"""You are a form-field classification assistant. Classify each field into exactly one category.
+
+Categories:
+  PERSONAL     — name, address, city, location, gender, date of birth
+  CONTACT      — email, phone, mobile
+  EDUCATION    — college, university, degree, major, graduation year, GPA
+  SOCIAL_LINK  — LinkedIn, GitHub, portfolio, LeetCode, website URLs
+  SKILL        — skills, technologies, programming languages
+  RESUME       — resume upload, CV, cover letter
+  AI_QUESTION  — open-ended questions needing a generated answer
+  UNKNOWN      — cannot determine
+
+Fields to classify:
+{field_descriptions}
+
+Return ONLY a JSON array (no markdown, no explanation):
+[
+  {{"id": "<field_id>", "category": "<CATEGORY>", "confidence": "high"}},
+  ...
+]
+"""
+
+    try:
+        response = _model(temperature=0.1).generate_content(prompt)
+        results = _parse_json(response.text)
+        if isinstance(results, dict):
+            results = results.get("fields", [])
+        # Validate and sanitize
+        classified = []
+        for r in results:
+            cat = r.get("category", "UNKNOWN").upper()
+            if cat not in VALID_CATEGORIES:
+                cat = "UNKNOWN"
+            classified.append({
+                "id": r["id"],
+                "category": cat,
+                "confidence": r.get("confidence", "high"),
+            })
+        return classified
+    except Exception:
+        # Fallback: return all as UNKNOWN
+        return [{"id": f["id"], "category": "UNKNOWN", "confidence": "low"} for f in fields]

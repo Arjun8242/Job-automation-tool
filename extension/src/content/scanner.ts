@@ -124,6 +124,7 @@ function scanElement(el: HTMLElement): DetectedField | null {
     required: isRequired(el),
     value: getValue(el),
     category: FieldCategory.UNKNOWN, // Classification is Phase 4
+    confidence: "low",
   };
 }
 

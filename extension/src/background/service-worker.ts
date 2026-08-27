@@ -71,6 +71,20 @@ onMessage((message: ExtensionMessage, sender, sendResponse) => {
       return true;
     }
 
+    case MessageType.CLASSIFY_FIELDS: {
+      // Content script sent ambiguous fields — ask the backend LLM
+      const BACKEND_URL = "http://localhost:8000/api/fields/classify";
+      fetch(BACKEND_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fields: message.payload }),
+      })
+        .then((res) => res.json())
+        .then((data) => sendResponse(data.fields ?? []))
+        .catch(() => sendResponse([]));
+      return true; // async response
+    }
+
     case MessageType.FORM_DETECTED: {
       sendResponse({ received: true });
       return false;

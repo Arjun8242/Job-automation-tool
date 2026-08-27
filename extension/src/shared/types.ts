@@ -18,6 +18,7 @@ export interface DetectedField {
   required: boolean;
   value: string;
   category: FieldCategory;
+  confidence: "high" | "low";
 }
 
 /** Analysis lifecycle states */
