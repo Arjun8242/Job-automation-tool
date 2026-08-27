@@ -1,14 +1,25 @@
 # AI Job Application Copilot
 
-> **V1 — Cold Email Automation** | Next.js + TypeScript + Tailwind · Python + FastAPI
+> **Cold Email Automation** | Next.js + TypeScript · Python + FastAPI + Google Gemini
 
-Automates the repetitive parts of recruiter cold outreach: you paste a JD, the system selects a relevant project + resume, personalises your email template, and creates a Gmail draft. You review and send.
+An automated recruiter outreach tool designed to eliminate repetitive application workflows. Paste a job description, and the copilot extracts key requirements, selects the most relevant project and resume from your verified knowledge base, personalises the outreach email using Google Gemini (with strict fact grounding), and inserts a rich draft directly into your Gmail account with clickable portfolio/GitHub/LinkedIn links and your resume attached.
+
+---
+
+## Features
+
+- **⚡ Instant Cold Email Generation**: Paste any Job Description (JD) to automatically match against your projects and generate a concise, tailored email.
+- **🛡️ Strict Fact Grounding**: The AI is strictly bounded to verified facts from your personal profile and projects (`data/profile.json` & `data/projects.json`).
+- **✉️ Direct Gmail Draft Integration**: Connects via Google OAuth 2.0 and generates rich MIME drafts directly in your Gmail drafts folder.
+- **🔗 Clickable Hyperlinks**: Automatically converts portfolio, GitHub, LinkedIn, and project URLs into styled clickable links in the Gmail composer.
+- **📎 Resume Matching & Auto-Attachment**: Automatically picks the best-fitting resume tag based on the JD stack and attaches the PDF to the Gmail draft.
+- **🖤 Minimalist Monochrome UI**: Clean, distraction-free black and white interface.
 
 ---
 
 ## Quick Start
 
-### 1. Clone & install
+### 1. Clone & Install Dependencies
 
 ```bash
 # Frontend
@@ -18,44 +29,70 @@ npm install
 # Backend
 cd ../backend
 python -m venv venv
-# Windows
-venv\Scripts\activate
-# macOS/Linux
+
+# Activate Virtualenv
+# Windows (PowerShell):
+.\venv\Scripts\Activate.ps1
+# macOS / Linux:
 source venv/bin/activate
+
+# Install Python requirements
 pip install -r requirements.txt
 ```
 
-### 2. Configure environment variables
+### 2. Configure Environment Variables
 
-```bash
-# Backend
-cp backend/.env.example backend/.env
-# Fill in: OPENAI_API_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+#### Backend (`backend/.env`)
+Create `backend/.env` (or copy from `backend/.env.example`):
 
-# Frontend
-cp frontend/.env.local.example frontend/.env.local
-# NEXT_PUBLIC_API_URL=http://localhost:8000  (default, usually fine)
+```env
+GEMINI_API_KEY=your_google_gemini_api_key
+GEMINI_MODEL=gemini-3.6-flash
 ```
 
-### 3. Add your data
+#### Google OAuth Credentials (Gmail API)
+1. Go to [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services** → **Credentials**.
+2. Enable the **Gmail API** and create an **OAuth 2.0 Client ID** (Desktop Application).
+3. Download the client secret JSON file and place it in:
+   ```
+   backend/.credentials/client_secret_xxxx.json
+   ```
 
-- **Profile**: edit `data/profile.json` with your name, email, links, skills.
-- **Projects**: edit `data/projects.json` with your projects.
-- **Resumes**: drop PDF files into `data/resumes/` (see naming guide inside).
+### 3. Add Your Personal Data
 
-### 4. Run
+- **Profile**: Edit `data/profile.json` with your details, skills, experience, and links (Portfolio, GitHub, LinkedIn).
+- **Projects**: Edit `data/projects.json` with your project portfolio, technologies, and achievements.
+- **Resumes**: Place your resume PDF files in `data/resumes/` (e.g. `software-engineer.pdf`, `backend.pdf`, `fullstack.pdf`).
+
+### 4. Run the Application
 
 ```bash
-# Terminal 1 — Backend
+# Terminal 1 — Backend (FastAPI)
 cd backend
-uvicorn main:app --reload --port 8000
+python -m uvicorn main:app --reload --port 8000
 
-# Terminal 2 — Frontend
+# Terminal 2 — Frontend (Next.js)
 cd frontend
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+---
+
+## Application Workflow
+
+```
+1. Paste Job Description (JD) & Recruiter Info
+                  ↓
+2. Gemini AI analyzes JD & matches relevant project + resume
+                  ↓
+3. Tailored email generated & humanized (fact-grounded)
+                  ↓
+4. Review & edit subject / body
+                  ↓
+5. Click "Create Gmail Draft" → Draft created in Gmail with resume attached & clickable links
+```
 
 ---
 
@@ -64,41 +101,36 @@ Open [http://localhost:3000](http://localhost:3000).
 ```
 .
 ├── data/
-│   ├── profile.json          # Your personal info
-│   ├── projects.json         # Your projects
-│   ├── templates.json        # Cold-email templates
+│   ├── profile.json          # Verified user profile, skills, and links
+│   ├── projects.json         # Verified project catalog
+│   ├── templates.json        # Base email template structure
 │   └── resumes/              # Resume PDFs (gitignored)
 │
-├── backend/                  # Python + FastAPI
-│   ├── main.py
-│   ├── api/                  # Route handlers
-│   ├── models/               # Pydantic models
-│   ├── services/             # AI + Gmail logic (Phases 3-4)
+├── backend/                  # Python + FastAPI backend
+│   ├── main.py               # FastAPI entrypoint & CORS setup
+│   ├── api/                  # API routers (outreach, gmail, profile, projects, resumes)
+│   ├── models/               # Pydantic data schemas
+│   ├── services/
+│   │   ├── ai_service.py     # Gemini AI JD analysis & grounded email generation
+│   │   └── gmail_service.py  # OAuth 2.0 flow & rich MIME draft creation
 │   └── utils/
+│       └── json_store.py     # Data file loader utilities
 │
-└── frontend/                 # Next.js + TypeScript + Tailwind
+└── frontend/                 # Next.js App Router + TypeScript
     └── src/
-        ├── app/              # Next.js App Router pages
-        ├── lib/api.ts        # Typed API client
-        └── types/index.ts    # Shared TypeScript interfaces
+        ├── app/
+        │   ├── page.tsx      # Main outreach copilot dashboard
+        │   └── globals.css   # Black & white monochrome design system
+        ├── lib/
+        │   └── api.ts        # Typed backend API client
+        └── types/
+            └── index.ts      # TypeScript interfaces
 ```
 
 ---
 
-## Development Phases
+## Security & Privacy
 
-| Phase | Status | Description |
-|-------|--------|-------------|
-| 1 — Setup & Data | ✅ Done | Project scaffold, data files, Pydantic models, TS types |
-| 2 — Profile & Template UI | ⬜ Next | Profile editor, project manager, template manager |
-| 3 — JD + Email Engine | ⬜ | LLM JD extraction, project/resume selection, email gen |
-| 4 — Gmail Integration | ⬜ | OAuth, MIME construction, draft creation |
-| 5 — Review UI + Testing | ⬜ | Full workflow polish and E2E testing |
-
----
-
-## Security Notes
-
-- `.env`, `.credentials/`, `data/resumes/`, and personal JSON files are **gitignored**.
-- Gmail OAuth tokens are stored locally in `.credentials/gmail_token.json`.
-- The tool never sends emails automatically — all sending is manual.
+- `.env`, `.credentials/`, `data/profile.json`, and `data/resumes/` are strictly **gitignored**.
+- Gmail OAuth tokens are persisted locally in `backend/.credentials/gmail_token.json` and auto-refreshed.
+- **Zero auto-sending**: The system only creates drafts in your Gmail account. You retain 100% control to review and send manually.

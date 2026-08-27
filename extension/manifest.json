@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "AI Job Copilot",
+  "version": "0.1.0",
+  "description": "AI-powered job application form filler. Reads application forms, fills repetitive fields, and generates answers for application questions.",
+  "permissions": [
+    "activeTab",
+    "sidePanel",
+    "storage"
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content-script.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "AI Job Copilot"
+  },
+  "icons": {}
+}
