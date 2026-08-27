@@ -1,0 +1,52 @@
+# =============================================================
+# .gitignore — AI Job Application Copilot
+# =============================================================
+
+# ---- Secrets & Credentials ----
+.env
+.env.local
+backend/.env
+backend/.credentials/
+.credentials/
+
+# ---- Personal Data ----
+data/profile.json
+data/projects.json
+data/resumes/
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ---- Node / Next.js ----
+node_modules/
+frontend/.next/
+frontend/out/
+frontend/dist/
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- IDE ----
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ---- Documentation / Planning ----
+docs/
+

@@ -1,0 +1,18 @@
+[
+  {
+    "id": "cold-outreach",
+    "name": "Cold Outreach",
+    "description": "Structured 7-part cold outreach for recruiter/HR contact tailored to the role and JD",
+    "structure": [
+      "1. Who I am (introduction)",
+      "2. What I do / what I'm good at (skills_and_expertise)",
+      "3. What I'm currently learning (currently_learning)",
+      "4. Why I'm contacting you (role & company)",
+      "5. Relevant project / experience (matched project highlights & metrics)",
+      "6. Resume + links (portfolio, github, linkedin, project live/code)",
+      "7. Call to action"
+    ],
+    "subject": "Application for {{role}} — {{sender_name}}",
+    "body": "Hi {{recruiter_name}},\n\nI'm {{sender_name}}, a {{degree}} student at {{college}} (graduating {{graduation_year}}), focused on backend and full-stack development.\n\nI primarily work with {{relevant_skill}}, and I'm currently deepening my knowledge of {{currently_learning}}.\n\nI'm reaching out regarding the {{role}} opening at {{company}}. Recently, I built {{relevant_project}} — {{project_description}} — where I {{project_highlight}}.\n\nI've attached my resume and would love to connect. You can also review my work at {{portfolio}} and on GitHub at {{github}}.\n\nLooking forward to hearing from you,\n{{sender_name}}\n{{linkedin}}"
+  }
+]
