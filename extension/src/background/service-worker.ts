@@ -15,9 +15,19 @@ onMessage((message: ExtensionMessage, sender, sendResponse) => {
       const tabId = sender.tab?.id ?? message.tabId;
       if (tabId) {
         chrome.sidePanel.open({ tabId }).catch(console.error);
+        sendResponse({ success: true });
+        return false;
       }
-      sendResponse({ success: true });
-      return false;
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        const activeTabId = tabs[0]?.id;
+        if (activeTabId) {
+          chrome.sidePanel.open({ tabId: activeTabId }).catch(console.error);
+          sendResponse({ success: true });
+        } else {
+          sendResponse({ success: false, error: "No active tab" });
+        }
+      });
+      return true;
     }
 
     case MessageType.ANALYZE_PAGE: {
@@ -83,6 +93,14 @@ onMessage((message: ExtensionMessage, sender, sendResponse) => {
         .then((data) => sendResponse(data.fields ?? []))
         .catch(() => sendResponse([]));
       return true; // async response
+    }
+
+    case MessageType.GET_PROFILE: {
+      fetch("http://localhost:8000/api/profile")
+        .then((res) => res.json())
+        .then((data) => sendResponse(data))
+        .catch(() => sendResponse(null));
+      return true;
     }
 
     case MessageType.FORM_DETECTED: {

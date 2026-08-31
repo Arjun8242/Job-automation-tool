@@ -1,11 +1,12 @@
 import { onMessage, sendMessage } from "../shared/messages";
-import { DetectedField, ExtensionMessage, FieldCategory, MessageType } from "../shared/types";
+import { DetectedField, ExtensionMessage, FieldCategory, FillResult, MessageType } from "../shared/types";
 import { classifyFields, getAmbiguousFields } from "./classifier";
+import { fillFields } from "./filler";
 import { resetScanner, scanPage, startObserver, stopObserver } from "./scanner";
 
 /**
  * Content script — runs on web pages.
- * Waits for explicit SCAN_PAGE from service worker, then scans and classifies.
+ * Waits for explicit SCAN_PAGE, then scans, classifies, and fills.
  */
 
 let analysisActive = false;
@@ -26,23 +27,18 @@ onMessage((message: ExtensionMessage, _sender, sendResponse) => {
       // 2. Classify with deterministic rules
       const classified = classifyFields(rawFields);
 
-      // 3. Request LLM classification for ambiguous fields
+      // 3. Request LLM classification for ambiguous fields, then fill
       const ambiguous = getAmbiguousFields(classified);
       if (ambiguous.length > 0) {
         sendMessage(MessageType.CLASSIFY_FIELDS, ambiguous)
           .then((response) => {
             const llmResults = response as DetectedField[] | undefined;
-            if (llmResults) {
-              mergeClassifications(classified, llmResults);
-            }
-            broadcastResults(classified);
+            if (llmResults) mergeClassifications(classified, llmResults);
           })
-          .catch(() => {
-            // LLM failed — still send what we have
-            broadcastResults(classified);
-          });
+          .catch(() => {})
+          .finally(() => fillAndBroadcast(classified));
       } else {
-        broadcastResults(classified);
+        fillAndBroadcast(classified);
       }
 
       // 4. Watch for dynamically added fields
@@ -84,10 +80,27 @@ function mergeClassifications(fields: DetectedField[], llmResults: DetectedField
   }
 }
 
-/** Send classified fields to the side panel via service worker */
-function broadcastResults(fields: DetectedField[]): void {
-  sendMessage(MessageType.FORM_DETECTED, {
-    url: window.location.href,
-    fields,
-  });
+/** Fetch profile, fill fields, then broadcast results to the side panel */
+function fillAndBroadcast(fields: DetectedField[]): void {
+  sendMessage<unknown, Record<string, unknown> | null>(MessageType.GET_PROFILE, {})
+    .then((profile) => {
+      let fillResults: FillResult[] = [];
+      if (profile) {
+        fillResults = fillFields(fields, profile);
+      }
+
+      sendMessage(MessageType.FORM_DETECTED, {
+        url: window.location.href,
+        fields,
+        fillResults,
+      });
+    })
+    .catch(() => {
+      // Profile fetch failed — still send fields without filling
+      sendMessage(MessageType.FORM_DETECTED, {
+        url: window.location.href,
+        fields,
+        fillResults: [],
+      });
+    });
 }

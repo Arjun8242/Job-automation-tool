@@ -46,6 +46,16 @@ export enum MessageType {
   UNKNOWN_FIELD = "UNKNOWN_FIELD",
   ERROR = "ERROR",
   OPEN_SIDE_PANEL = "OPEN_SIDE_PANEL",
+  // Phase 5 — profile
+  GET_PROFILE = "GET_PROFILE",
+}
+
+/** Result of filling a single field */
+export interface FillResult {
+  fieldId: string;
+  filled: boolean;
+  value: string;
+  skipped?: string; // reason if skipped (e.g. "non-empty", "low-confidence")
 }
 
 /** Typed message envelope for all extension communication */

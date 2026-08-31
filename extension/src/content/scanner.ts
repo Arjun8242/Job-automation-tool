@@ -8,6 +8,9 @@ import { DetectedField, FieldCategory } from "../shared/types";
 /** Elements we've already scanned (prevents duplicates on re-scan / MutationObserver) */
 const scannedElements = new WeakSet<Element>();
 
+/** Map of field ID → DOM element (used by filler to set values) */
+const elementMap = new Map<string, HTMLElement>();
+
 /** Monotonic counter for generating unique field IDs */
 let fieldCounter = 0;
 
@@ -117,13 +120,16 @@ function scanElement(el: HTMLElement): DetectedField | null {
   scannedElements.add(el);
   fieldCounter++;
 
+  const fieldId = el.id || `field-${fieldCounter}`;
+  elementMap.set(fieldId, el);
+
   return {
-    id: el.id || `field-${fieldCounter}`,
+    id: fieldId,
     label: resolveLabel(el),
     type,
     required: isRequired(el),
     value: getValue(el),
-    category: FieldCategory.UNKNOWN, // Classification is Phase 4
+    category: FieldCategory.UNKNOWN,
     confidence: "low",
   };
 }
@@ -199,10 +205,17 @@ export function stopObserver(): void {
 }
 
 /**
+ * Look up the DOM element for a given field ID.
+ */
+export function getElement(fieldId: string): HTMLElement | undefined {
+  return elementMap.get(fieldId);
+}
+
+/**
  * Reset scanner state (for re-scanning after stop).
  */
 export function resetScanner(): void {
   stopObserver();
   fieldCounter = 0;
-  // WeakSet doesn't need clearing — old elements will be GC'd
+  elementMap.clear();
 }
