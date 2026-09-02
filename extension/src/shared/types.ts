@@ -17,6 +17,7 @@ export interface DetectedField {
   type: string;
   required: boolean;
   value: string;
+  options?: string[];
   category: FieldCategory;
   confidence: "high" | "low";
 }
@@ -48,6 +49,10 @@ export enum MessageType {
   OPEN_SIDE_PANEL = "OPEN_SIDE_PANEL",
   // Phase 5 — profile
   GET_PROFILE = "GET_PROFILE",
+  // Phase 6 — resumes
+  GET_RESUMES = "GET_RESUMES",
+  ATTACH_RESUME = "ATTACH_RESUME",
+  RESUME_ATTACHED = "RESUME_ATTACHED",
 }
 
 /** Result of filling a single field */
@@ -56,6 +61,20 @@ export interface FillResult {
   filled: boolean;
   value: string;
   skipped?: string; // reason if skipped (e.g. "non-empty", "low-confidence")
+}
+
+/** Payload for attaching a resume */
+export interface AttachResumePayload {
+  fieldId: string;
+  filename: string;
+}
+
+/** Result of attaching a resume */
+export interface AttachResumeResult {
+  fieldId: string;
+  filename: string;
+  success: boolean;
+  error?: string;
 }
 
 /** Typed message envelope for all extension communication */

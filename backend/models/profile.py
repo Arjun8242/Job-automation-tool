@@ -17,6 +17,7 @@ class Links(BaseModel):
     linkedin: Optional[str] = None
     github: Optional[str] = None
     portfolio: Optional[str] = None
+    leetcode: Optional[str] = None
 
 
 class Experience(BaseModel):
@@ -34,6 +35,10 @@ class Profile(BaseModel):
     email: str
     phone: Optional[str] = None
     location: Optional[str] = None
+    currentCity: Optional[str] = None
+    currentAddress: Optional[str] = None
+    noticePeriod: Optional[str] = "Immediate"
+    noticePeriodDays: Optional[int] = 0
     education: Education
     links: Links
     skills: List[str] = []

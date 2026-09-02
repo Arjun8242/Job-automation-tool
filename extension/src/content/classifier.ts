@@ -41,7 +41,9 @@ const RULES: Rule[] = [
   // SKILL
   { pattern: /\bskills?\b|\btechnolog(?:y|ies)|\bcoding\s*lang/i, category: FieldCategory.SKILL },
 
-  // PERSONAL
+  // PERSONAL & AVAILABILITY
+  { pattern: /\b(?:current\s*)?(?:company|employer|organization)\b/i, category: FieldCategory.PERSONAL },
+  { pattern: /\bnotice\s*(?:period)?|\bavailab|\bhow\s*soon|\bjoin(?:ing)?\s*(?:time|date|period)|\bstart\s*(?:date|timing|time|immediately)|\bearliest\s*start|\bwhen\s*can\s*you\s*start/i, category: FieldCategory.PERSONAL },
   { pattern: /\bfirst\s*name/i, category: FieldCategory.PERSONAL },
   { pattern: /\blast\s*name|\bsurname|\bfamily\s*name/i, category: FieldCategory.PERSONAL },
   { pattern: /\bfull\s*name|\byour\s*name|\bname\b/i, category: FieldCategory.PERSONAL },
@@ -60,18 +62,22 @@ const QUESTION_PATTERNS = [
   /\btell\s*(?:us|me)\s*about/i,
   /\bdescribe\b/i,
   /\bexplain\b/i,
-  /\bwhat\s*(?:makes|motivates|interests|excites|drives)/i,
+  /\bwhat\s*(?:makes|motivates|interests|excites|drives|projects?|challenges?|experience)/i,
   /\bhow\s*(?:did|would|will|do)\s*you/i,
   /\bwhy\s*should\s*we/i,
   /\bcover\s*letter/i,
   /\badditional\s*(?:info|information|comments|notes)/i,
+  /\bshare\s*(?:a|your|an)/i,
+  /\banything\s*else/i,
 ];
 
 /**
  * Build a searchable text from a field's metadata.
  */
 function fieldText(field: DetectedField): string {
-  return `${field.label} ${field.id} ${field.type}`.toLowerCase();
+  return [field.label, field.id, field.type, ...(field.options ?? [])]
+    .join(" ")
+    .toLowerCase();
 }
 
 /**

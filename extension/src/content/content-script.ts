@@ -1,7 +1,7 @@
 import { onMessage, sendMessage } from "../shared/messages";
 import { DetectedField, ExtensionMessage, FieldCategory, FillResult, MessageType } from "../shared/types";
 import { classifyFields, getAmbiguousFields } from "./classifier";
-import { fillFields } from "./filler";
+import { attachResumeToInput, fillFields } from "./filler";
 import { resetScanner, scanPage, startObserver, stopObserver } from "./scanner";
 
 /**
@@ -44,11 +44,7 @@ onMessage((message: ExtensionMessage, _sender, sendResponse) => {
       // 4. Watch for dynamically added fields
       startObserver((newFields) => {
         const classifiedNew = classifyFields(newFields);
-        sendMessage(MessageType.FORM_DETECTED, {
-          url: window.location.href,
-          fields: classifiedNew,
-          incremental: true,
-        });
+        fillAndBroadcast(classifiedNew, true);
       });
 
       sendResponse({ status: "scan_complete", fieldCount: classified.length });
@@ -60,6 +56,31 @@ onMessage((message: ExtensionMessage, _sender, sendResponse) => {
       stopObserver();
       resetScanner();
       sendResponse({ status: "stopped" });
+      return false;
+    }
+
+    case MessageType.ATTACH_RESUME: {
+      const { fieldId, filename, base64 } = message.payload as {
+        fieldId: string;
+        filename: string;
+        base64: string;
+      };
+
+      try {
+        // Decode base64 into ArrayBuffer
+        const binaryStr = atob(base64);
+        const len = binaryStr.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binaryStr.charCodeAt(i);
+        }
+
+        const success = attachResumeToInput(fieldId, bytes.buffer, filename);
+        sendResponse({ success, filename, fieldId });
+      } catch (err: any) {
+        console.error("[AI Job Copilot] Attachment error:", err);
+        sendResponse({ success: false, error: err.message });
+      }
       return false;
     }
 
@@ -81,7 +102,7 @@ function mergeClassifications(fields: DetectedField[], llmResults: DetectedField
 }
 
 /** Fetch profile, fill fields, then broadcast results to the side panel */
-function fillAndBroadcast(fields: DetectedField[]): void {
+function fillAndBroadcast(fields: DetectedField[], incremental = false): void {
   sendMessage<unknown, Record<string, unknown> | null>(MessageType.GET_PROFILE, {})
     .then((profile) => {
       let fillResults: FillResult[] = [];
@@ -93,6 +114,7 @@ function fillAndBroadcast(fields: DetectedField[]): void {
         url: window.location.href,
         fields,
         fillResults,
+        incremental,
       });
     })
     .catch(() => {
@@ -101,6 +123,7 @@ function fillAndBroadcast(fields: DetectedField[]): void {
         url: window.location.href,
         fields,
         fillResults: [],
+        incremental,
       });
     });
 }

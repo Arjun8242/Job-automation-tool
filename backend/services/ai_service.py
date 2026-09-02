@@ -458,7 +458,7 @@ def classify_fields(fields: list[dict]) -> list[dict]:
         return []
 
     field_descriptions = json.dumps(
-        [{"id": f["id"], "label": f.get("label", ""), "type": f.get("type", "text")} for f in fields],
+        [{"id": f["id"], "label": f.get("label", ""), "type": f.get("type", "text"), "options": f.get("options", [])} for f in fields],
         indent=2,
     )
 

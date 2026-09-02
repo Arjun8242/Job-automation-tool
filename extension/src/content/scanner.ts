@@ -6,7 +6,7 @@ import { DetectedField, FieldCategory } from "../shared/types";
  */
 
 /** Elements we've already scanned (prevents duplicates on re-scan / MutationObserver) */
-const scannedElements = new WeakSet<Element>();
+let scannedElements = new WeakSet<Element>();
 
 /** Map of field ID → DOM element (used by filler to set values) */
 const elementMap = new Map<string, HTMLElement>();
@@ -32,45 +32,141 @@ function isVisible(el: HTMLElement): boolean {
 }
 
 /**
- * Resolve the best label text for a form element.
- * Priority: <label for> → parent <label> → aria-label → aria-labelledby → placeholder → name → ""
+ * Clean dynamic UI clutter, autocomplete messages, and status hints from extracted labels.
+ */
+function cleanLabelText(text: string): string {
+  if (!text) return "";
+  let cleaned = text
+    .replace(/no location found\.?/gi, "")
+    .replace(/try entering a different location\.?/gi, "")
+    .replace(/loading\.{0,3}/gi, "")
+    .replace(/select (?:an|a) (?:option|value)\.{0,3}/gi, "")
+    .replace(/type to search\.{0,3}/gi, "")
+    .replace(/\b(?:required|optional)\b/gi, "")
+    .replace(/[*]+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  // If label is just a random UUID/hash like "cards c3ffff75 d9aa..." return empty so fallback searches parents
+  if (/^[a-f0-9_\-\s]{20,}$/i.test(cleaned) || /cards[\s_-]+[a-f0-9]{8}/i.test(cleaned)) {
+    return "";
+  }
+
+  return cleaned;
+}
+
+/**
+ * Resolve the best human-readable label text for a form element.
+ * Priority:
+ * 1. <label for="id">
+ * 2. Parent <label>
+ * 3. Enclosing question/field container headers (legend, .label, [class*='question'], [class*='title'])
+ * 4. aria-label / aria-labelledby
+ * 5. Preceding sibling labels/headings
+ * 6. placeholder
+ * 7. name attribute (if readable)
  */
 function resolveLabel(el: HTMLElement): string {
   // 1. <label for="id">
   if (el.id) {
     const label = document.querySelector<HTMLLabelElement>(`label[for="${CSS.escape(el.id)}"]`);
-    if (label?.textContent?.trim()) return label.textContent.trim();
+    if (label?.textContent) {
+      const text = cleanLabelText(label.textContent);
+      if (text) return text;
+    }
   }
 
   // 2. Parent <label>
   const parentLabel = el.closest("label");
   if (parentLabel) {
-    // Get label text without the input's own value
     const clone = parentLabel.cloneNode(true) as HTMLElement;
-    clone.querySelectorAll("input, textarea, select").forEach((c) => c.remove());
-    const text = clone.textContent?.trim();
+    clone.querySelectorAll("input, textarea, select, ul, [role='listbox']").forEach((c) => c.remove());
+    const text = cleanLabelText(clone.textContent || "");
     if (text) return text;
   }
 
-  // 3. aria-label
-  const ariaLabel = el.getAttribute("aria-label");
-  if (ariaLabel?.trim()) return ariaLabel.trim();
+  // 3. Parent container (Greenhouse cards, Ashby questions, Lever groups, form-groups)
+  const container = el.closest(
+    ".field, .form-group, .form-field, .question, [class*='field'], [class*='question'], [class*='card'], [class*='form-row'], fieldset, [data-testid*='question'], [data-testid*='field']"
+  );
+  if (container) {
+    // Check for legend
+    const legend = container.querySelector("legend");
+    if (legend?.textContent) {
+      const text = cleanLabelText(legend.textContent);
+      if (text) return text;
+    }
 
-  // 4. aria-labelledby
+    // Check for label / title / prompt sub-elements inside container
+    const headerEl = container.querySelector(
+      "label, .label, [class*='label'], [class*='title'], [class*='prompt'], [class*='header'], [class*='name'], h3, h4, h5, p, span, strong, b"
+    );
+    if (headerEl && headerEl !== el && !headerEl.contains(el)) {
+      const text = cleanLabelText(headerEl.textContent || "");
+      if (text && text.length > 1 && text.length < 200) return text;
+    }
+  }
+
+  // 4. Preceding sibling label or text element
+  let prev = el.previousElementSibling;
+  while (prev) {
+    if (prev.matches("label, .label, [class*='label'], [class*='title'], h3, h4, h5, p, span, strong, b, legend")) {
+      const text = cleanLabelText(prev.textContent || "");
+      if (text && text.length < 150) return text;
+    }
+    prev = prev.previousElementSibling;
+  }
+
+  // 5. aria-label
+  const ariaLabel = el.getAttribute("aria-label");
+  if (ariaLabel) {
+    const text = cleanLabelText(ariaLabel);
+    if (text) return text;
+  }
+
+  // 6. aria-labelledby
   const labelledBy = el.getAttribute("aria-labelledby");
   if (labelledBy) {
-    const parts = labelledBy.split(/\s+/).map((id) => document.getElementById(id)?.textContent?.trim()).filter(Boolean);
-    if (parts.length) return parts.join(" ");
+    const parts = labelledBy
+      .split(/\s+/)
+      .map((id) => document.getElementById(id)?.textContent)
+      .filter(Boolean);
+    if (parts.length) {
+      const text = cleanLabelText(parts.join(" "));
+      if (text) return text;
+    }
   }
 
-  // 5. placeholder
+  // 7. placeholder
   if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-    if (el.placeholder?.trim()) return el.placeholder.trim();
+    if (el.placeholder) {
+      const text = cleanLabelText(el.placeholder);
+      if (text) return text;
+    }
   }
 
-  // 6. name attribute (humanize it)
+  // 8. For file inputs: check closest container / dropzone text
+  if (el instanceof HTMLInputElement && el.type === "file") {
+    const fileContainer = el.closest(
+      "[class*='resume'], [class*='cv'], [class*='upload'], [class*='file'], [class*='drop'], [data-testid*='resume'], [data-testid*='upload'], .dropzone"
+    );
+    if (fileContainer) {
+      const containerText = cleanLabelText(fileContainer.textContent || "");
+      if (containerText && containerText.length < 100) {
+        return containerText;
+      }
+    }
+    return "Resume / CV";
+  }
+
+  // 9. name attribute (if readable and not a random hash)
   const name = el.getAttribute("name");
-  if (name) return name.replace(/[_\-\[\]]+/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").trim();
+  if (name) {
+    const cleaned = cleanLabelText(
+      name.replace(/[_\-\[\]]+/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2")
+    );
+    if (cleaned) return cleaned;
+  }
 
   return "";
 }
@@ -79,10 +175,16 @@ function resolveLabel(el: HTMLElement): string {
  * Get the current value of a form element.
  */
 function getValue(el: HTMLElement): string {
-  if (el instanceof HTMLInputElement) return el.value;
-  if (el instanceof HTMLTextAreaElement) return el.value;
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return el.value;
   if (el instanceof HTMLSelectElement) return el.value;
   return "";
+}
+
+function getOptions(el: HTMLElement): string[] {
+  if (!(el instanceof HTMLSelectElement)) return [];
+  return Array.from(el.options)
+    .map((option) => option.text.trim())
+    .filter(Boolean);
 }
 
 /**
@@ -102,7 +204,6 @@ function isRequired(el: HTMLElement): boolean {
   if ((el as HTMLInputElement).required) return true;
   if (el.getAttribute("aria-required") === "true") return true;
 
-  // Check if the associated label contains a "*" indicator
   const label = resolveLabel(el);
   return label.includes("*");
 }
@@ -115,7 +216,8 @@ function scanElement(el: HTMLElement): DetectedField | null {
 
   const type = getFieldType(el);
   if (IGNORED_TYPES.has(type)) return null;
-  if (!isVisible(el)) return null;
+  // File inputs are frequently visually hidden behind styled upload buttons/dropzones
+  if (type !== "file" && !isVisible(el)) return null;
 
   scannedElements.add(el);
   fieldCounter++;
@@ -129,6 +231,7 @@ function scanElement(el: HTMLElement): DetectedField | null {
     type,
     required: isRequired(el),
     value: getValue(el),
+    options: getOptions(el),
     category: FieldCategory.UNKNOWN,
     confidence: "low",
   };
@@ -217,5 +320,6 @@ export function getElement(fieldId: string): HTMLElement | undefined {
 export function resetScanner(): void {
   stopObserver();
   fieldCounter = 0;
+  scannedElements = new WeakSet<Element>();
   elementMap.clear();
 }

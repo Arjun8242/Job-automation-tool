@@ -103,6 +103,53 @@ onMessage((message: ExtensionMessage, sender, sendResponse) => {
       return true;
     }
 
+    case MessageType.GET_RESUMES: {
+      fetch("http://localhost:8000/api/resumes/")
+        .then((res) => res.json())
+        .then((data) => sendResponse(data))
+        .catch(() => sendResponse([]));
+      return true;
+    }
+
+    case MessageType.ATTACH_RESUME: {
+      const payload = message.payload as { fieldId: string; filename: string; tabId?: number };
+      const filename = payload.filename || "software-engineer.pdf";
+
+      chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+        const tabId = payload.tabId ?? tabs[0]?.id;
+        if (!tabId) {
+          sendResponse({ success: false, error: "No active tab" });
+          return;
+        }
+
+        try {
+          const res = await fetch(`http://localhost:8000/api/resumes/file/${encodeURIComponent(filename)}`);
+          if (!res.ok) throw new Error(`Failed to fetch resume: ${res.statusText}`);
+          const buffer = await res.arrayBuffer();
+
+          // Convert ArrayBuffer to binary string / base64 for message passing
+          let binary = "";
+          const bytes = new Uint8Array(buffer);
+          for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          const base64 = btoa(binary);
+
+          const result = await sendTabMessage(tabId, MessageType.ATTACH_RESUME, {
+            fieldId: payload.fieldId,
+            filename,
+            base64,
+          });
+
+          sendResponse(result);
+        } catch (err: any) {
+          console.error("Attach resume error:", err);
+          sendResponse({ success: false, error: err.message });
+        }
+      });
+      return true;
+    }
+
     case MessageType.FORM_DETECTED: {
       sendResponse({ received: true });
       return false;

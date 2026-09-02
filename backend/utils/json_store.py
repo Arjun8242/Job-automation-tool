@@ -38,9 +38,15 @@ def list_resumes() -> list[str]:
     """Return filenames of all PDFs in the resumes directory."""
     if not RESUMES_DIR.exists():
         return []
-    return [f.name for f in RESUMES_DIR.iterdir() if f.suffix.lower() == ".pdf"]
+    return sorted(
+        f.name for f in RESUMES_DIR.iterdir() if f.is_file() and f.suffix.lower() == ".pdf"
+    )
 
 
 def resume_path(filename: str) -> Path:
-    """Return the absolute path to a resume PDF."""
-    return RESUMES_DIR / filename
+    """Return a safe absolute path to a resume PDF inside data/resumes."""
+    resume_root = RESUMES_DIR.resolve()
+    candidate = (RESUMES_DIR / filename).resolve()
+    if candidate.parent != resume_root or candidate.suffix.lower() != ".pdf":
+        raise ValueError("Invalid resume filename")
+    return candidate

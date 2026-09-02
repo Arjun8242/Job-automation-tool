@@ -83,8 +83,14 @@ async def create_draft(request: DraftCreationRequest):
     # Resolve resume path
     pdf_path = None
     if request.resume_filename:
-        pdf_path = resume_path(request.resume_filename)
-        if not pdf_path.exists():
+        try:
+            pdf_path = resume_path(request.resume_filename)
+        except ValueError:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Resume file '{request.resume_filename}' not found in data/resumes/.",
+            )
+        if not pdf_path.is_file():
             raise HTTPException(
                 status_code=404,
                 detail=f"Resume file '{request.resume_filename}' not found in data/resumes/.",

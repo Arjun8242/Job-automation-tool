@@ -10,6 +10,7 @@ class FieldInput(BaseModel):
     id: str
     label: str = ""
     type: str = "text"
+    options: list[str] = []
 
 
 class ClassifyRequest(BaseModel):
